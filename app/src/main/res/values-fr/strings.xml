@@ -329,4 +329,5 @@ track.geojson échantillons mesurés chaque seconde au format geojson (http://ge
     <string name="localisation_policy_title" >Accès à votre position</string>
     <string name="localisation_policy_webpage">file:///android_asset/html/localisation_notice_fr.html</string>
     <string name="policy_button_understood">J\'ai compris</string>
+    <string name="result_tab_linechart">Temps</string>
 </resources>

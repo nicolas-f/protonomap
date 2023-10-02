@@ -725,8 +725,9 @@ public class MeasurementManager {
                                 Storage.Leq.COLUMN_ACCURACY + "," +
                                 Storage.Leq.COLUMN_LOCATION_UTC + "," +
                                 Storage.Leq.COLUMN_SPEED + "," +
-                                Storage.Leq.COLUMN_BEARING +
-                                ") VALUES (?, ?,?,?,?,?,?,?,?)");
+                                Storage.Leq.COLUMN_BEARING + "," +
+                                Storage.Leq.COLUMN_LAEQ +
+                                ") VALUES (?, ?,?,?,?,?,?,?,?,?)");
                 SQLiteStatement leqValueStatement = database.compileStatement("INSERT INTO " +
                         Storage.LeqValue.TABLE_NAME + " VALUES (?,?,?)");
                 for (LeqBatch leqBatch : leqBatches) {
@@ -753,6 +754,7 @@ public class MeasurementManager {
                     } else {
                         leqStatement.bindNull(9);
                     }
+                    leqStatement.bindDouble(10, leq.getLAeq());
                     long leqId = leqStatement.executeInsert();
                     for (Storage.LeqValue leqValue : leqBatch.getLeqValues()) {
                         leqValueStatement.clearBindings();
@@ -852,12 +854,18 @@ public class MeasurementManager {
             leqValues.add(leqValue);
         }
 
-        public double computeGlobalLeq() {
-            double globalLeq = 0;
-            for(Storage.LeqValue leqValue : leqValues) {
-                globalLeq += Math.pow(10, leqValue.getSpl() / 10.);
+        public double computeGlobalLAeq() {
+            if(leq.getLAeq() > 0) {
+                return leq.getLAeq();
+            } else {
+                // old measurements does not store LAeq but compute third octave LAeq
+                // From NoiseCapture 1.3 spectrum is not A weighted
+                double energeticSum = 0;
+                for (Storage.LeqValue leqValue : leqValues) {
+                    energeticSum += Math.pow(10, leqValue.getSpl() / 10.);
+                }
+                return 10 * Math.log10(energeticSum);
             }
-            return 10 * Math.log10(globalLeq);
         }
 
         public Storage.Leq getLeq() {

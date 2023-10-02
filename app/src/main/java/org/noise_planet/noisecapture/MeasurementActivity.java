@@ -570,7 +570,7 @@ public class MeasurementActivity extends MainActivity implements
                 for(MeasurementManager.LeqBatch location : locations) {
                     Storage.Leq leq = location.getLeq();
                     String htmlColor = MeasurementExport.getColorFromLevel
-                            (location.computeGlobalLeq());
+                            (location.computeGlobalLAeq());
                     mapFragment.addMeasurement(new MapFragment.LatLng(leq.getLatitude(), leq
                             .getLongitude()), htmlColor);
                 }

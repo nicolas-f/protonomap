@@ -27,6 +27,7 @@
 
 package org.noise_planet.noisecapture;
 
+import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
@@ -48,6 +49,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.github.mikephil.charting.charts.BarChart;
+import com.github.mikephil.charting.charts.LineChart;
 import com.github.mikephil.charting.charts.PieChart;
 import com.github.mikephil.charting.components.Legend;
 import com.github.mikephil.charting.components.Legend.LegendPosition;
@@ -58,13 +60,18 @@ import com.github.mikephil.charting.data.BarData;
 import com.github.mikephil.charting.data.BarDataSet;
 import com.github.mikephil.charting.data.BarEntry;
 import com.github.mikephil.charting.data.Entry;
+import com.github.mikephil.charting.data.LineData;
+import com.github.mikephil.charting.data.LineDataSet;
 import com.github.mikephil.charting.data.PieData;
 import com.github.mikephil.charting.data.PieDataSet;
 import com.github.mikephil.charting.formatter.PercentFormatter;
 import com.github.mikephil.charting.formatter.ValueFormatter;
+import com.github.mikephil.charting.formatter.YAxisValueFormatter;
 import com.github.mikephil.charting.highlight.Highlight;
 import com.github.mikephil.charting.interfaces.datasets.IBarDataSet;
+import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
 import com.github.mikephil.charting.utils.ViewPortHandler;
+import com.google.android.material.tabs.TabLayout;
 import com.nhaarman.supertooltips.ToolTip;
 import com.nhaarman.supertooltips.ToolTipRelativeLayout;
 import com.nhaarman.supertooltips.ToolTipView;
@@ -74,16 +81,20 @@ import org.orbisgis.sos.LeqStats;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Results extends MainActivity {
     private static final Logger LOGGER = LoggerFactory.getLogger(Results.class);
+    // 1s measurements will be aggregated if there is more than this number of seconds
+    public static final int MAXIMUM_X_VALUES_TIME_NOISE_LEVEL = 300;
     private MeasurementManager measurementManager;
     private Storage.Record record;
     private static final double[][] CLASS_RANGES = new double[][]{{Double.MIN_VALUE, 45}, {45, 55},
@@ -96,14 +107,15 @@ public class Results extends MainActivity {
     // For the Charts
     public PieChart rneChart;
     public PieChart neiChart;
-    protected BarChart sChart; // Spectrum representation
+    public ViewPagerExt viewPager;
 
     // Other resources
-    private String[] ltob;  // List of third-octave bands
     private String[] catNE; // List of noise level category (defined as resources)
-    private List<Float> splHistogram;
-    private LeqStats leqStats = new LeqStats();
+    //private LeqStats leqStats = new LeqStats();
     private List<String> tags;
+
+    private ResultsLineChartFragment resultsLineChartFragment;
+    private ResultsSpectrumFragment resultsSpectrumFragment;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -111,6 +123,11 @@ public class Results extends MainActivity {
         SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(this);
         boolean showTooltip = sharedPref.getBoolean("settings_tooltip", true);
         setContentView(R.layout.activity_results);
+        viewPager = findViewById(R.id.result_viewpager);
+        setupViewPager(viewPager);
+        TabLayout tabLayout = findViewById(R.id.result_tabs);
+        tabLayout.setupWithViewPager(viewPager);
+
         this.measurementManager = new MeasurementManager(this);
         Intent intent = getIntent();
         if(intent != null && intent.hasExtra(RESULTS_RECORD_ID)) {
@@ -148,12 +165,7 @@ public class Results extends MainActivity {
         Legend lnei = neiChart.getLegend();
         lnei.setEnabled(false);
 
-        // Cumulated spectrum
-        sChart = (BarChart) findViewById(R.id.spectrumChart);
-        initSpectrumChart();
-        Legend ls = sChart.getLegend();
-        ls.setEnabled(false); // Hide legend
-
+        // Other fields
         TextView minText = (TextView) findViewById(R.id.textView_value_Min_SL);
         minText.setText(R.string.no_valid_dba_value);
         if(showTooltip) {
@@ -225,6 +237,15 @@ public class Results extends MainActivity {
 
 
         AsyncTask.execute(new LoadMeasurements(this));
+    }
+
+    private void setupViewPager(ViewPagerExt viewPager) {
+        ViewPagerAdapter adapter = new ViewPagerAdapter(getSupportFragmentManager());
+        resultsLineChartFragment = new ResultsLineChartFragment();
+        resultsSpectrumFragment = new ResultsSpectrumFragment();
+        adapter.addFragment(resultsLineChartFragment, getString(R.string.result_tab_linechart));
+        adapter.addFragment(resultsSpectrumFragment, getString(R.string.measurement_tab_spectrum));
+        viewPager.setAdapter(adapter);
     }
 
     private static final class OnGoToMeasurePage implements View.OnClickListener {
@@ -320,72 +341,9 @@ public class Results extends MainActivity {
     }
 
 
-    public void initSpectrumChart(){
-        sChart.setPinchZoom(false);
-        sChart.setDoubleTapToZoomEnabled(false);
-        sChart.setDrawBarShadow(false);
-        sChart.setDescription("");
-        sChart.setPinchZoom(false);
-        sChart.setDrawGridBackground(false);
-        sChart.setHighlightPerTapEnabled(true);
-        sChart.setHighlightPerDragEnabled(false);
-        sChart.setDrawHighlightArrow(true);
-        sChart.setDrawValueAboveBar(true);
-        // XAxis parameters: hide all
-        XAxis xls = sChart.getXAxis();
-        xls.setPosition(XAxisPosition.BOTTOM);
-        xls.setDrawAxisLine(true);
-        xls.setDrawGridLines(false);
-        xls.setLabelRotationAngle(-90);
-        xls.setDrawLabels(true);
-        xls.setTextColor(Color.WHITE);
-        xls.setLabelsToSkip(0);
-        // YAxis parameters (left): main axis for dB values representation
-        YAxis yls = sChart.getAxisLeft();
-        yls.setDrawAxisLine(true);
-        yls.setDrawGridLines(true);
-        yls.setAxisMaxValue(110.f);
-        yls.setStartAtZero(true);
-        yls.setTextColor(Color.WHITE);
-        yls.setGridColor(Color.WHITE);
-        // YAxis parameters (right): no axis, hide all
-        YAxis yrs = sChart.getAxisRight();
-        yrs.setEnabled(false);
-        //return true;
-    }
 
 
 
-    // Read spl data for spectrum representation
-    private void setDataS() {
-
-        ArrayList<String> xVals = new ArrayList<String>();
-        Collections.addAll(xVals, ltob);
-
-
-        ArrayList<BarEntry> yVals1 = new ArrayList<BarEntry>();
-
-        for (int i = 0; i < splHistogram.size(); i++) {
-            yVals1.add(new BarEntry(splHistogram.get(i), i));
-        }
-
-        BarDataSet set1 = new BarDataSet(yVals1, "DataSet");
-        set1.setValueTextColor(Color.WHITE);
-
-        set1.setColors(
-                new int[]{Color.rgb(0, 128, 255), Color.rgb(0, 128, 255), Color.rgb(0, 128, 255),
-                        Color.rgb(102, 178, 255), Color.rgb(102, 178, 255),
-                        Color.rgb(102, 178, 255)});
-
-        ArrayList<IBarDataSet> dataSets = new ArrayList<IBarDataSet>();
-        dataSets.add(set1);
-
-        BarData data = new BarData(xVals, dataSets);
-        data.setValueTextSize(10f);
-        data.setValueFormatter(new FreqValueFormatter(sChart));
-        sChart.setData(data);
-        sChart.invalidate();
-    }
 
     // Init RNE Pie Chart
     public void initRNEChart(){
@@ -462,7 +420,6 @@ public class Results extends MainActivity {
         //return true;
     }
 
-    // Generate artificial data for NEI
     private void setNEIData() {
 
         ArrayList<Entry> yVals1 = new ArrayList<Entry>();
@@ -493,29 +450,6 @@ public class Results extends MainActivity {
         neiChart.invalidate();
     }
 
-
-    private static final class FreqValueFormatter implements ValueFormatter {
-        private BarChart sChart;
-
-        public FreqValueFormatter(BarChart sChart) {
-            this.sChart = sChart;
-        }
-
-        @Override
-        public String getFormattedValue(float value, Entry entry, int dataSetIndex, ViewPortHandler viewPortHandler) {
-            if(!sChart.valuesToHighlight()) {
-                return "";
-            }
-            Highlight[] highlights = sChart.getHighlighted();
-            for (final Highlight highlight : highlights) {
-                int xIndex = highlight.getXIndex();
-                if (xIndex == entry.getXIndex()) {
-                    return String.format(Locale.getDefault(), "%.1f dB", value);
-                }
-            }
-            return "";
-        }
-    }
 
     private static class ToolTipListener implements View.OnTouchListener {
         private Results results;
@@ -638,59 +572,45 @@ public class Results extends MainActivity {
         @Override
         public void run() {
 
-            // Query database
-            List<Integer> frequencies = new ArrayList<Integer>();
-            List<Float[]> leqValues = new ArrayList<Float[]>();
-            activity.measurementManager.getRecordLeqs(activity.record.getId(), frequencies, leqValues, new
-                    ReadRecordsProgression(activity));
+            final OneSecondLeqVisitor leqVisitor = new OneSecondLeqVisitor();
 
-            // Create leq statistics by frequency
-            LeqStats[] leqStatsByFreq = new LeqStats[frequencies.size()];
-            for(int idFreq = 0; idFreq < leqStatsByFreq.length; idFreq++) {
-                leqStatsByFreq[idFreq] = new LeqStats();
-            }
-            // parse each leq window time
-            for(Float[] leqFreqs : leqValues) {
-                double rms = 0;
-                int idFreq = 0;
-                for(float leqValue : leqFreqs) {
-                    leqStatsByFreq[idFreq].addLeq(leqValue);
-                    rms += Math.pow(10, leqValue / 10);
-                    idFreq++;
-                }
-                activity.leqStats.addLeq(10 * Math.log10(rms));
-            }
-            activity.splHistogram = new ArrayList<>(leqStatsByFreq.length);
-            activity.ltob = new String[leqStatsByFreq.length];
+            // Query 1s database without storing all values in memory
+            activity.measurementManager.getRecordLocations(activity.record.getId(), leqVisitor);
+
+            final List<Float> splHistogram = new ArrayList<>(leqVisitor.leqStatsByFreq.length);
+            // List of third-octave bands
+            final String[] ltob = new String[leqVisitor.leqStatsByFreq.length];
             int idFreq = 0;
-            for (LeqStats aLeqStatsByFreq : leqStatsByFreq) {
-                activity.ltob[idFreq] = Spectrogram.formatFrequency(frequencies.get(idFreq));
-                activity.splHistogram.add((float) aLeqStatsByFreq.getLeqMean());
+            for (LeqStats aLeqStatsByFreq : leqVisitor.leqStatsByFreq) {
+                ltob[idFreq] = Spectrogram.formatFrequency((int)AudioProcess.realTimeCenterFrequency[idFreq]);
+                splHistogram.add((float) aLeqStatsByFreq.getLeqMean());
                 idFreq++;
             }
 
-            final LeqStats.LeqOccurrences leqOccurrences = activity.leqStats.computeLeqOccurrences
+            final LeqStats.LeqOccurrences leqOccurrences = leqVisitor.leqStats.computeLeqOccurrences
                     (CLASS_RANGES);
             activity.runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
                     activity.setRNEData(leqOccurrences.getUserDefinedOccurrences());
                     activity.setNEIData();
-                    activity.setDataS();
+                    activity.resultsLineChartFragment.setTimeLevelData(leqOccurrences,
+                            leqVisitor.splSecond, leqVisitor.splValues);
+                    activity.resultsSpectrumFragment.setDataS(splHistogram, ltob);
 
                     TextView minText = (TextView) activity.findViewById(R.id.textView_value_Min_SL);
-                    minText.setText(String.format(Locale.getDefault(), "%.01f", activity.leqStats
+                    minText.setText(String.format(Locale.getDefault(), "%.01f", leqVisitor.leqStats
                             .getLeqMin()));
 
                     activity.findViewById(R.id.textView_color_Min_SL).setBackgroundColor(activity
-                            .NE_COLORS[getNEcatColors(activity.leqStats.getLeqMin())]);
+                            .NE_COLORS[getNEcatColors(leqVisitor.leqStats.getLeqMin())]);
 
                     TextView maxText = (TextView) activity.findViewById(R.id.textView_value_Max_SL);
-                    maxText.setText(String.format(Locale.getDefault(), "%.01f", activity.leqStats
+                    maxText.setText(String.format(Locale.getDefault(), "%.01f", leqVisitor.leqStats
                             .getLeqMax()));
 
                     activity.findViewById(R.id.textView_color_Max_SL)
-                            .setBackgroundColor(activity.NE_COLORS[getNEcatColors(activity.leqStats.getLeqMax())]);
+                            .setBackgroundColor(activity.NE_COLORS[getNEcatColors(leqVisitor.leqStats.getLeqMax())]);
 
                     TextView la10Text = (TextView) activity.findViewById(R.id.textView_value_LA10);
                     la10Text.setText(String.format(Locale.getDefault(), "%.01f", leqOccurrences.getLa10()));
@@ -710,9 +630,8 @@ public class Results extends MainActivity {
                     activity.findViewById(R.id.textView_color_LA90)
                             .setBackgroundColor(activity.NE_COLORS[getNEcatColors(leqOccurrences.getLa90())]);
 
-                    // launch animation
-                    if(activity.sChart != null) {
-                        activity.sChart.animateXY(1500, 1500);
+                    if(activity.resultsLineChartFragment.getTimeLevelChart() != null) {
+                        activity.resultsLineChartFragment.getTimeLevelChart().animateX(1500);
                     }
                     if(activity.neiChart != null) {
                         activity.neiChart.animateXY(1500, 1500);
@@ -723,6 +642,50 @@ public class Results extends MainActivity {
                 }
             });
 
+        }
+    }
+    private static class OneSecondLeqVisitor implements MeasurementManager.RecordVisitor<MeasurementManager.LeqBatch> {
+        private LeqStats leqStats = new LeqStats();
+        private LeqStats[] leqStatsByFreq = new LeqStats[AudioProcess.realTimeCenterFrequency.length];
+        private List<Float> splHistogram = new ArrayList<>(AudioProcess.realTimeCenterFrequency.length);
+        private List<Integer> splSecond = new ArrayList<>(Results.MAXIMUM_X_VALUES_TIME_NOISE_LEVEL);
+        private List<Float> splValues = new ArrayList<>(Results.MAXIMUM_X_VALUES_TIME_NOISE_LEVEL);
+        private int step;
+        private long firstUTC = 0;
+
+        public OneSecondLeqVisitor() {
+            for(int idFreq = 0; idFreq < leqStatsByFreq.length; idFreq++) {
+                leqStatsByFreq[idFreq] = new LeqStats();
+            }
+        }
+
+        @Override
+        public void onCreateCursor(int recordCount) {
+            if(recordCount < Results.MAXIMUM_X_VALUES_TIME_NOISE_LEVEL) {
+                step = 1;
+            } else {
+                step = (int)Math.ceil(recordCount /
+                        (double)Results.MAXIMUM_X_VALUES_TIME_NOISE_LEVEL);
+            }
+        }
+
+        @Override
+        public boolean next(MeasurementManager.LeqBatch record) {
+            leqStats.addLeq(record.computeGlobalLAeq());
+            int idFreq = 0;
+            for(Storage.LeqValue leqValue : record.getLeqValues()) {
+                leqStatsByFreq[idFreq].addLeq(leqValue.getSpl());
+                idFreq++;
+            }
+            if(firstUTC == 0) {
+                firstUTC = record.getLeq().getLeqUtc();
+            }
+            long elapsedTime = (record.getLeq().getLeqUtc() - firstUTC) / 1000 + 1;
+            if(elapsedTime % step == 0) {
+                splSecond.add((int)elapsedTime);
+                splValues.add((float)record.computeGlobalLAeq());
+            }
+            return true;
         }
     }
 }

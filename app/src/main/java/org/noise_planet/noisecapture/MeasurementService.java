@@ -617,14 +617,17 @@ public class MeasurementService extends Service {
                     Storage.Leq leq;
                     if (location == null) {
                         leq = new Storage.Leq(measurementService.recordId, -1, measure
-                                .getBeginRecordTime(), 0, 0, null, null, null, 0.f, 0);
+                                .getBeginRecordTime(), 0, 0, null,
+                                null, null, 0.f, 0,
+                                (float)measure.getGlobaldBaValue());
                     } else {
                         leq = new Storage.Leq(measurementService.recordId, -1, measure
                                 .getBeginRecordTime(), location.getLatitude(), location.getLongitude(),
                                 location.hasAltitude() ? location.getAltitude() : null,
                                 location.hasSpeed() ? location.getSpeed() : null,
                                 location.hasBearing() ? location.getBearing() : null,
-                                location.getAccuracy(), location.getTime());
+                                location.getAccuracy(), location.getTime(),
+                                (float)measure.getGlobaldBaValue());
                     }
                     double[] freqValues = measurementService.audioProcess.getDelayedCenterFrequency();
                     final double[] leqs = measure.getLeqs();

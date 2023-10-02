@@ -336,4 +336,7 @@ track.geojson 1s samples of measures. Using the geojson format (http://geojson.i
     <string name="policy_button_understood">Acknowledge</string>
     <string name="title_settings_onomap_url">Community server url</string>
     <string name="title_settings_onomap_url_summary">NoiseCapture will upload measurement to this community server</string>
+    <string name="result_laeq">LAeq</string>
+    <string name="result_linechart_description">Temporal evolution of noise levels in dB(A)</string>
+    <string name="result_tab_linechart">Time</string>
 </resources>

@@ -84,7 +84,7 @@ public class TestDB {
 
         int recordId = measurementManager.addRecord(Storage.Record.CALIBRATION_METHODS.None);
         Storage.Leq leq = new Storage.Leq(recordId, -1, System.currentTimeMillis(), 12, 15, 50.d,
-                15.f, 4.f, 4.5f,System.currentTimeMillis());
+                15.f, 4.f, 4.5f,System.currentTimeMillis(), 0);
         List<Storage.LeqValue> leqValues = new ArrayList<>();
 
         leqValues .add(new Storage.LeqValue(-1, 125, 65));
@@ -98,7 +98,8 @@ public class TestDB {
         MeasurementManager.LeqBatch leqBatch = new MeasurementManager.LeqBatch(leq,leqValues);
         measurementManager.addLeqBatch(leqBatch);
         leq = new Storage.Leq(recordId, -1, System.currentTimeMillis(), 12.01, 15.02, 51.d,
-                12.f, 3.02f, 5f,System.currentTimeMillis());
+                12.f, 3.02f, 5f,System.currentTimeMillis(),
+                (float)leqBatch.computeGlobalLAeq());
         leqBatch = new MeasurementManager.LeqBatch(leq,leqValues);
         measurementManager.addLeqBatch(leqBatch);
 
@@ -121,12 +122,12 @@ public class TestDB {
 
         // Check update ending measure
 
-        measurementManager.updateRecordFinal(recordId, (float)leqBatch.computeGlobalLeq(), 2, 2.31f);
+        measurementManager.updateRecordFinal(recordId, (float)leqBatch.computeGlobalLAeq(), 2, 2.31f);
 
 
         Storage.Record incompleteRecord = measurementManager.getRecord(recordId);
         assertNull(incompleteRecord.getPleasantness());
-        assertEquals((float)leqBatch.computeGlobalLeq(), incompleteRecord.getLeqMean(), 0.01);
+        assertEquals((float)leqBatch.computeGlobalLAeq(), incompleteRecord.getLeqMean(), 0.01);
         assertEquals(2.31f, incompleteRecord.getCalibrationGain(), 0.01);
         assertNull(incompleteRecord.getNoisePartyTag());
 
@@ -153,7 +154,7 @@ public class TestDB {
 
         int recordId = measurementManager.addRecord(Storage.Record.CALIBRATION_METHODS.None);
         Storage.Leq leq = new Storage.Leq(recordId, -1, System.currentTimeMillis(), 12, 15, 50.d,
-                15.f, 4.f, 4.5f,System.currentTimeMillis());
+                15.f, 4.f, 4.5f,System.currentTimeMillis(),0);
         List<Storage.LeqValue> leqValues = new ArrayList<>();
 
         leqValues .add(new Storage.LeqValue(-1, 125, 65));
@@ -167,7 +168,8 @@ public class TestDB {
         MeasurementManager.LeqBatch leqBatch = new MeasurementManager.LeqBatch(leq,leqValues);
         measurementManager.addLeqBatch(leqBatch);
         leq = new Storage.Leq(recordId, -1, System.currentTimeMillis(), 12.01, 15.02, 51.d,
-                12.f, 3.02f, 5f,System.currentTimeMillis());
+                12.f, 3.02f, 5f,System.currentTimeMillis(),
+                (float)leqBatch.computeGlobalLAeq());
         leqBatch = new MeasurementManager.LeqBatch(leq,leqValues);
         measurementManager.addLeqBatch(leqBatch);
 
@@ -208,7 +210,7 @@ public class TestDB {
 
         int recordId = measurementManager.addRecord(Storage.Record.CALIBRATION_METHODS.Traffic);
         Storage.Leq leq = new Storage.Leq(recordId, -1, System.currentTimeMillis(), 12, 15, 50.d,
-                15.f, 4.f, 4.5f,System.currentTimeMillis());
+                15.f, 4.f, 4.5f,System.currentTimeMillis(),0);
         List<Storage.LeqValue> leqValues = new ArrayList<>();
 
         leqValues .add(new Storage.LeqValue(-1, 125, 65));
@@ -222,11 +224,11 @@ public class TestDB {
         MeasurementManager.LeqBatch leqBatch = new MeasurementManager.LeqBatch(leq,leqValues);
         measurementManager.addLeqBatch(leqBatch);
         leq = new Storage.Leq(recordId, -1, System.currentTimeMillis(), 12.01, 15.02, 51.d,
-                12.f, 3.02f, 5f,System.currentTimeMillis());
+                12.f, 3.02f, 5f,System.currentTimeMillis(), 0);
         leqBatch = new MeasurementManager.LeqBatch(leq,leqValues);
         measurementManager.addLeqBatch(leqBatch);
 
-        measurementManager.updateRecordFinal(recordId, (float)leqBatch.computeGlobalLeq(), 2, -4.76f);
+        measurementManager.updateRecordFinal(recordId, (float)leqBatch.computeGlobalLAeq(), 2, -4.76f);
         measurementManager.updateRecordUserInput(recordId, "This is a description",
                 (short)2,new String[]{Storage.TAGS_INFO[0].name, Storage.TAGS_INFO[4].name},
                 Uri.fromFile(new File(Objects.requireNonNull(TestDB.class.getResource("calibration.png")).getFile())),
@@ -270,7 +272,7 @@ public class TestDB {
         assertEquals(Storage.Record.CALIBRATION_METHODS.Traffic.name(), meta.getProperty(MeasurementExport.PROP_METHOD_CALIBRATION));
         assertEquals("OGRS2018", meta.getProperty(Storage.Record.COLUMN_NOISEPARTY_TAG));
         assertEquals(-4.76f, Float.parseFloat(meta.getProperty(MeasurementExport.PROP_GAIN_CALIBRATION)), 0.01f);
-        assertEquals((float)leqBatch.computeGlobalLeq(),
+        assertEquals((float)leqBatch.computeGlobalLAeq(),
                 Float.parseFloat(meta.getProperty(Storage.Record.COLUMN_LEQ_MEAN)), 0.01f);
     }
 
@@ -285,7 +287,7 @@ public class TestDB {
 
         int recordId = measurementManager.addRecord(Storage.Record.CALIBRATION_METHODS.None);
         Storage.Leq leq = new Storage.Leq(recordId, -1, System.currentTimeMillis(), 12, 15, 50.d,
-                15.f, 4.f, 4.5f,System.currentTimeMillis());
+                15.f, 4.f, 4.5f,System.currentTimeMillis(), 0);
         List<Storage.LeqValue> leqValues = new ArrayList<>();
 
         leqValues .add(new Storage.LeqValue(-1, 125, 65));
@@ -299,11 +301,11 @@ public class TestDB {
         MeasurementManager.LeqBatch leqBatch = new MeasurementManager.LeqBatch(leq,leqValues);
         measurementManager.addLeqBatch(leqBatch);
         leq = new Storage.Leq(recordId, -1, System.currentTimeMillis(), Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY, Double.NaN,
-                Float.NaN, Float.NaN, 5f,System.currentTimeMillis());
+                Float.NaN, Float.NaN, 5f,System.currentTimeMillis(), 0);
         leqBatch = new MeasurementManager.LeqBatch(leq,leqValues);
         measurementManager.addLeqBatch(leqBatch);
 
-        measurementManager.updateRecordFinal(recordId, (float)leqBatch.computeGlobalLeq(), 2, -4.76f);
+        measurementManager.updateRecordFinal(recordId, (float)leqBatch.computeGlobalLAeq(), 2, -4.76f);
         measurementManager.updateRecordUserInput(recordId, "This is a description",
                 (short)2,new String[]{Storage.TAGS_INFO[0].name, Storage.TAGS_INFO[4].name},
                 Uri.fromFile(new File(Objects.requireNonNull(TestDB.class.getResource("calibration.png")).getFile())),
@@ -346,7 +348,7 @@ public class TestDB {
         assertEquals("NOVICE", meta.getProperty(MeasurementExport.PROP_USER_PROFILE));
         assertEquals("OGRS2018", meta.getProperty(Storage.Record.COLUMN_NOISEPARTY_TAG));
         assertEquals(-4.76f, Float.parseFloat(meta.getProperty(MeasurementExport.PROP_GAIN_CALIBRATION)), 0.01f);
-        assertEquals((float)leqBatch.computeGlobalLeq(),
+        assertEquals((float)leqBatch.computeGlobalLAeq(),
                 Float.parseFloat(meta.getProperty(Storage.Record.COLUMN_LEQ_MEAN)), 0.01f);
     }
 

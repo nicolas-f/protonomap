@@ -166,7 +166,7 @@ public class MeasurementExport {
 
             // Add properties
             JSONObject featureProperties = new JSONObject();
-            double lAeq = entry.computeGlobalLeq();
+            double lAeq = entry.computeGlobalLAeq();
             featureProperties.put(Storage.Record.COLUMN_LEQ_MEAN, boundValue(Float.valueOf((float) lAeq), 0, 150));
             //marker-color tag for geojson.io and leaflet map
             featureProperties.put("marker-color", getColorFromLevel(lAeq));
@@ -236,7 +236,7 @@ public class MeasurementExport {
             writer.name("properties");
             writer.beginObject(); // begin properties
 
-            double lAeq = entry.computeGlobalLeq();
+            double lAeq = entry.computeGlobalLAeq();
             writer.name(Storage.Record.COLUMN_LEQ_MEAN);
             writer.value(boundValue((float) lAeq, 0, 150));
             writer.name("marker-color");
